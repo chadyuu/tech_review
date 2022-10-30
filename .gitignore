@@ -1,0 +1,5 @@
+.Rproj.user
+*_cache
+*_files
+.Rhistory
+*.Rproj

@@ -1,0 +1,238 @@
+---
+title: "Tech Review: How GPT has evolved"
+author: "Yutaro Nishiyama (yutaron2@illinois.edu)"
+date: "2022-10-31"
+bibliography: references.bib
+execute:
+  cache: true
+format:
+  pdf:
+    toc: false
+    number-sections: true
+    colorlinks: true
+---
+
+# Introduction
+
+GPT (Generative Pre-trained Transformer) was developed by OpenAI in 2018. Before GPT, major NLP models were trained on large annotated data to perform specific tasks, such as sentiment classification and textual entailment, which had two major limitations:
+
+1.  Fail to generalize beyond specific tasks
+2.  Require much manual labor to label a training dataset.
+
+OpenAI has developed GPT, which addresses these issues, and released GPT-2 in 2019 and GPT-3 in 2020. In this review, we will investigate the three GPT models and clarify how GPT has evolved.
+
+# GPT-1
+
+GPT-1 realizes generalization with fewer labeled training data by
+
+1.  training the model on unlabeled data as unsupervised learning
+2.  tuning parameters as supervised learning with fewer data.(@radford2018improving)
+
+## Unsupervised pre-training
+
+GPT-1 used the [BooksCorpus](https://yknzhu.wixsite.com/mbweb) and [1 Billion Word Language Model Benchmark](https://www.statmt.org/lm-benchmark/) datasets as training dataset for pre-training. Given this unsupervised corpus of tokens $u={u_1, …, u_n}$, we maximize the following likelihood to obtain a language model.
+
+$$
+L_1(u) = \sum_i \log P(u_i | u_{i-k},...,u_{i-1};\theta)
+$$
+
+where $k$ is the size of the context window and $k=512$ in GPT-1.
+
+To train its parameters, GPT-1 uses a multi-layer Transformer decoder as follows.
+
+![Radford et al. (2018)](images/paste-FDE6C3E2.png){fig-align="center"}
+
+The input $h_0$ is defined as
+
+$$
+h_0 = UW_e + W_p
+$$
+
+where $U = (u_{-k},…,u_{-1},)$, $W_e$ is the token embedding matrix, and $W_p$ is the position embedding matrix. $U$ starts with `Start`, ends with `Extract`, and is separated by `Delim`.
+
+Then, GPT-1 processes the input through 12 decoder layers, i.e., transformer blocks, each of which has
+
+1.  Masked Multi-Head attention
+
+2.  Normalization
+
+3.  Feed Forward Network
+
+4.  Layer Normalization.
+
+$$
+h_l = \text{transformer-block} (h_{l-1}) \forall i \in [1,n]
+$$
+
+Finally, it predicts the next word with a linear and softmax layer.
+
+$$
+P(u) = \text{softmax}(h_n W_e^T)
+$$
+
+GPT-1 train the model for 100 epochs on minibatches of 64 randomly sampled, contiguous sequences of 512 tokens.
+
+## Supervised fine-tuning
+
+After unsupervised pre-training, GPT-1 adapt the parameters to the supervised target task by substitute the last linear & softmax layer with another layer for a specific task.
+
+Given a labeled dataset $C$ composed of input tokens $x^1,….x^m$ with a label $y$, the last layer is defined as
+
+$$
+P(y|x^1,...,x^m) = \text{softmax}(h_l^m W_y).
+$$
+
+GPT-1 tunes the parameter to maximize
+
+$$
+L_2(C) = \sum \log P(y|x^1,...,x^m) + \lambda L_1(C)
+$$
+
+where $\lambda = 0.5$, since adding $L_1$ improves generalization and accelerates convergence.
+
+Surprisingly, GPT-3 finetunes the parameters for only 3 epochs in most cases.
+
+## Results
+
+GPT-1 improved the state of the art on 9 of the 12 following datasets.
+
+| Task                       | Datasets                                                           |
+|-----------------------|------------------------------------------------|
+| Natural language inference | **SNLI**, **MultiNLI**, **Question NLI**, RTE, **SciTail**         |
+| Question Answering         | **RACE**, **Story Cloze**                                          |
+| Sentence similarity        | MSR Paraphrase Corpus, **Quora Question Pairs,** **STS Benchmark** |
+| Classificaiton             | Stanford Sentiment Treebank-2, **CoLA**                            |
+
+: **Bold datasets** are those GPT-1 improved SoTA for.
+
+In addition, zero-shot performance of GPT-1 indicates that language model can realize the generalization. Zero-shot performance means no fine-tuning to a specific task after pre-training.
+
+![The evolution of zero-shot performance on different tasks as a function of LM pre-training updates. Performance per task is normalized between a random guess baseline and the current state-of-the-art with a single model. (Radford et al. (2018))](images/paste-0C2C859C.png){fig-align="center" width="509"}
+
+# GPT-2
+
+In 2019, OpenAI developed GPT to GPT-2 trained on a larger dataset with 1.5 billion parameters, which is over 10 times larger than GPT-1 with 117 million parameters (@radford2019language). Although GTP-2 has many similarities with GPT-1, it makes the following changes.
+
+### Dataset for pre-training
+
+GPT-2 used the WebText dataset for pre-training, which is specifically created for this model. To assure the quality of corpus, the researchers scraped all outbound links from Reddit, a social media, with at least 3 karma.
+
+### Input layer
+
+The context token size increases from 512 to 1024. The batch size also increases from 64 to 512.
+
+### Decoder layers
+
+The number of decoder layers increases to 48. The order of layers also changed as follows.
+
+1.  Layer Normalization
+
+2.  Masked Multi-Head attention
+
+3.  Layer Normalization
+
+4.  Feed Forward Network
+
+## Results
+
+GTP-2 achieved SoTA on 7 out of 8 datasets in zero-shot.
+
+![Radford et al. (2019)](images/paste-24ED1C73.png){fig-align="center"}
+
+GPT-2 also achieved SoTA in Children's book test (@hill2015goldilocks), LAMBADA (LAnguage Modeling Broadened to Account for Discourse Aspects, @paperno2016lambada), and Winoward Schema Challenge (@levesque2012winograd).
+
+# GPT-3
+
+In 2020, GPT-3 was released as the third version of GPT (@brown2020language). GPT-3 increases the number of parameters drastically to 175 billion parameters, since the scaling law indicates that a larger transformer performs better (@kaplan2020). Scaling Law quantifies how cross-entropy is estimated as follows.
+
+Given $L$ is cross-entropy,
+
+$$
+L \propto N^{-\alpha_N}
+$$
+
+where N is the number of parameters and $\alpha_N \sim 0.076$.
+
+$$
+L \propto D^{-\alpha_D}
+$$
+
+where D is the data size and $\alpha_D \sim 0.095$.
+
+$$
+L \propto C^{-\alpha_C}
+$$
+
+where N is the computation cost and $\alpha_C \sim 0.057$.
+
+In addition to the increase in parameters, GPT-3 evolves from GPT-2 in several ways.
+
+## Dataset for pre-training
+
+GPT-3 used a five different corpora, i.e., Common Crawl, WebText2, Books1, Books2, and Wikipedia.
+
+### Input layer
+
+The context token size increases from 1024 to 2048. The batch size also increases from 512 to 3.2 million.
+
+## Decoder Layer
+
+GPT-3 adopts Sparse Transformer (@child2019generating), which pay attention to limited number of preceding tokens (i.e., sparse) to lighten Multi-Head attention layers. Also, the number of decoder layers increases to 96.
+
+## No need for fine-tuning
+
+GPT-3 requires no fine-tuning. In this sense, GPT-3 achieved full generalization, independent from any specific tasks. Instead, we provide examples of a specific task to the model before performing it, although the model updates no parameters with the examples.
+
+-   Few-shot: provides a few examples
+
+-   One-shot: provides one example
+
+-   Zero-shot: provides no example
+
+## Results
+
+Among the results of GPT-3 the paper (@brown2020language) demonstrates, we introduces some interesting ones here.
+
+First, GPT-3 achieved SoTA in LAMBADA, while not in StoryCloze and HellaSwag.
+
+![Brown et al. (2020)](images/paste-5580522C.png){fig-align="center"}
+
+For QA tasks, GPT-3 beat SoTA of Fine-tuned models in Trivia QA.
+
+![Brown et al. (2020)](images/paste-36B6A654.png){fig-align="center"}
+
+GPT-3 surprisingly achieved SoTA in the translation from French to English and Dutch to English, although it is trained on dataset, 93% of which is English.
+
+![Brown et al. (2020)](images/paste-9B292C6E.png){fig-align="center"}
+
+The following table shows the accuracy of arithmetic tasks. E.g., 2D+ means 2 digit addition.
+
+![Brown et al. (2020)](images/paste-B0E3E1B8.png){fig-align="center"}
+
+GPT-3 seems to understand arithmetic calculation as humans do, since only 17 out of 2,000 addition problems and 2 out of 2,000 subtraction problems in the training dataset match the test dataset.
+
+We can find another interesting result in SAT analogies, where GPT-3 beat the average score of 57% among college applicants.
+
+![Brown et al. (2020)](images/paste-81B50571.png){fig-align="center"}
+
+Finally, mean human accuracy at detecting model generated articles is about 50%, which is chance level performance. I.e., articles generated by GPT-3 achieved the human level.
+
+![Brown et al. (2020)](images/paste-28F9C71D.png){fig-align="center"}
+
+{{< pagebreak >}}
+
+# Conclusion
+
+Thus, GPT has evolved from the first version to the third one to address preceding issues while the model size monotononically has increased as follows.
+
+|                     | GPT-1       | GPT-2       | GPT-3       |
+|---------------------|-------------|-------------|-------------|
+| #parameters         | 117 million | 1.5 billion | 175 billion |
+| #decoder layers     | 12          | 48          | 96          |
+| #context token size | 512         | 1024        | 2048        |
+| #hidden layer       | 768         | 1600        | 12288       |
+| #batch size         | 64          | 512         | 3.2 million |
+
+GPT-1's idea of unsupervised pre-training and supervised fine-tuning with fewer data realizes the breakthrough in NLP. Moreover, the fact that GPT-3 without fine-tuning beat several SoTAs indicates the potential to solve various kinds of NLP problems with such huge language models with much less manual labour.
+
+# References
